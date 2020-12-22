@@ -2,19 +2,15 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"time"
 )
 
 func index(wr http.ResponseWriter, r *http.Request) {
 	http.ServeFile(wr, r, "resources/html/index.html")
 }
 
-func displayAnImage(wr http.ResponseWriter, r *http.Request) {
-	http.ServeFile(wr, r, "resources/images/cat.jpg")
-}
-
-func uploadImage(w http.ResponseWriter, r *http.Request) {
+func uploadImage(wr http.ResponseWriter, r *http.Request) {
 
 	r.ParseMultipartForm(1024 << 15)
 
@@ -29,7 +25,9 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("\nFile Name: %+v", handler.Size)
 	fmt.Printf("\nMIME Name: %+v", handler.Header)
 
-	tempFile, err := ioutil.TempFile("resources/images", "upload-*.png")
+	name := "upload-*.png"
+
+	/* tempFile, err := ioutil.TempFile("resources/images", name)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -40,7 +38,9 @@ func uploadImage(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	tempFile.Write(fileByte)
+	tempFile.Write(fileByte) */
+
+	http.ServeContent(wr, r, name, time.Now(), file)
 
 }
 
