@@ -12,7 +12,7 @@ func index(wr http.ResponseWriter, r *http.Request) {
 
 func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 
-	r.ParseMultipartForm(32 * 1024 * 1024)
+	r.ParseMultipartForm(8 << 20)
 
 	file, handler, err := r.FormFile("pic")
 	if err != nil {
@@ -33,8 +33,12 @@ func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println(http.DetectContentType(buff))
-
-	http.ServeContent(wr, r, handler.Filename, time.Now(), file)
+	if http.DetectContentType(buff) == "image/png" || http.DetectContentType(buff) == "image/img" || http.DetectContentType(buff) == "image/jpeg" {
+		http.ServeContent(wr, r, handler.Filename, time.Now(), file)
+	} else {
+		http.Error(wr, "Invalid file format", http.StatusBadRequest)
+		return
+	}
 
 }
 
@@ -42,4 +46,5 @@ func main() {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/upload", uploadAnImage)
 	http.ListenAndServe(":8080", nil)
+
 }
