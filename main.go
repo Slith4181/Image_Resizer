@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"image/png"
 	"net/http"
 	"time"
+
+	"github.com/nfnt/resize"
 )
 
 func index(wr http.ResponseWriter, r *http.Request) {
@@ -14,12 +17,12 @@ func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 
 	r.ParseMultipartForm(8 << 20)
 
-	file, handler, err := r.FormFile("pic")
+	image, handler, err := r.FormFile("pic")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	defer file.Close()
+	defer image.Close()
 
 	fmt.Printf("\nFile Name: %+v", handler.Filename)
 	fmt.Printf("\nFile Name: %+v", handler.Size)
@@ -27,19 +30,23 @@ func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 
 	buff := make([]byte, 512)
 
-	if _, err = file.Read(buff); err != nil {
+	if _, err = image.Read(buff); err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	inputImage, err := png.Decode(image)
+	imgResized := resize.Resize(1366, 768, inputImage, resize.MitchellNetravali)
+
 	fmt.Println(http.DetectContentType(buff))
+
 	if http.DetectContentType(buff) == "image/png" || http.DetectContentType(buff) == "image/img" || http.DetectContentType(buff) == "image/jpeg" {
-		http.ServeContent(wr, r, handler.Filename, time.Now(), file)
+		http.ServeContent(wr, r, handler.Filename, time.Now(), image)
 	} else {
 		http.Error(wr, "Invalid file format", http.StatusBadRequest)
 		return
-	}
-
+	} // Handle error
+	png.Encode(wr, imgResized)
 }
 
 func main() {
