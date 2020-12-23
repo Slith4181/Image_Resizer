@@ -10,11 +10,11 @@ func index(wr http.ResponseWriter, r *http.Request) {
 	http.ServeFile(wr, r, "resources/html/index.html")
 }
 
-func uploadImage(wr http.ResponseWriter, r *http.Request) {
+func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 
-	r.ParseMultipartForm(1024 << 15)
+	r.ParseMultipartForm(32 * 1024 * 1024)
 
-	file, handler, err := r.FormFile("myFile")
+	file, handler, err := r.FormFile("pic")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -25,27 +25,21 @@ func uploadImage(wr http.ResponseWriter, r *http.Request) {
 	fmt.Printf("\nFile Name: %+v", handler.Size)
 	fmt.Printf("\nMIME Name: %+v", handler.Header)
 
-	name := "upload-*.png"
+	buff := make([]byte, 512)
 
-	/* tempFile, err := ioutil.TempFile("resources/images", name)
-	if err != nil {
+	if _, err = file.Read(buff); err != nil {
 		fmt.Println(err)
+		return
 	}
 
-	defer tempFile.Close()
+	fmt.Println(http.DetectContentType(buff))
 
-	fileByte, err := ioutil.ReadAll(file)
-	if err != nil {
-		fmt.Println(err)
-	}
-	tempFile.Write(fileByte) */
-
-	http.ServeContent(wr, r, name, time.Now(), file)
+	http.ServeContent(wr, r, handler.Filename, time.Now(), file)
 
 }
 
 func main() {
 	http.HandleFunc("/", index)
-	http.HandleFunc("/upload", uploadImage)
+	http.HandleFunc("/upload", uploadAnImage)
 	http.ListenAndServe(":8080", nil)
 }
