@@ -1,84 +1,108 @@
 package main
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
 	"image"
+	"image/jpeg"
 	"image/png"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"time"
+	"text/template"
 
 	"github.com/nfnt/resize"
 )
 
-func index(wr http.ResponseWriter, r *http.Request) {
-	http.ServeFile(wr, r, "resources/html/index.html")
+type Page struct {
+	Title string
+	Body  []byte
 }
 
-func uploadAnPicture(wr http.ResponseWriter, r *http.Request) {
+type UploadResponse struct {
+	Path string
+}
 
-	r.ParseMultipartForm(8 << 20)
+func uploadFile(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("File Upload Endpoint Hit")
 
-	picture, handler, err := r.FormFile("pic")
+	r.ParseMultipartForm(10 << 20)
+	file, handler, err := r.FormFile("image")
 	if err != nil {
+		fmt.Println("Error Retrieving the File")
 		fmt.Println(err)
 		return
 	}
-	defer picture.Close()
 
-	fmt.Printf("\nFile Name: %+v", handler.Filename)
-	fmt.Printf("\nFile Name: %+v", handler.Size)
-	fmt.Printf("\nMIME Name: %+v", handler.Header)
+	imageType := handler.Header.Get("Content-Type")
 
-	buff := make([]byte, 512)
+	switch imageType {
+	case "image/jpeg":
 
-	if _, err = picture.Read(buff); err != nil {
-		fmt.Println(err)
-		return
+		img, _, err := image.Decode(file)
+		m := resize.Resize(100, 100, img, resize.Lanczos3)
+		path := fmt.Sprintf("media/%s", handler.Filename)
+
+		out, err := os.Create(path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer out.Close()
+
+		// write new image to file
+		jpeg.Encode(out, m, nil)
+
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		data := UploadResponse{Path: path}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(data)
+		break
+
+	case "image/png":
+
+		img, _, err := image.Decode(file)
+		m := resize.Resize(100, 100, img, resize.Lanczos3)
+		path := fmt.Sprintf("media/%s", handler.Filename)
+
+		out, err := os.Create(path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer out.Close()
+
+		// write new image to file
+		png.Encode(out, m)
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		data := UploadResponse{Path: path}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(data)
+		break
 	}
-	//working code
+}
 
-	buffer := new(bytes.Buffer)
+func homePage(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len("/"):]
+	fmt.Println(title)
+	t, _ := template.ParseFiles("templates/home.html")
+	t.Execute(w, &Page{Title: "Resizer"})
+}
 
-	Decode_Image, _, err := image.Decode(bytes.NewReader(buff))
-	if err != nil {
-		log.Fatal(err)
-	}
-	Resized_Image := resize.Resize(500, 0, Decode_Image, resize.Lanczos3) //Ресайз декодированного изображения
-
-	files, err := os.Create(handler.Filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	png.Encode(buffer, Resized_Image)
-
-	tempFile, err := ioutil.TempFile("File_storage", handler.Filename)
-	defer tempFile.Close()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Copy the uploaded file to the created file on the filesystem
-	if _, err := io.Copy(tempFile, files); err != nil {
-		log.Fatal(err)
-		return
-	}
-	//working code
-	if http.DetectContentType(buff) == "image/png" || http.DetectContentType(buff) == "image/img" || http.DetectContentType(buff) == "image/jpeg" {
-		http.ServeContent(wr, r, handler.Filename, time.Now(), picture)
-	} else {
-		http.Error(wr, "Invalid file format", http.StatusBadRequest)
-		return
-	} // Handle error
+func setupRoutes() {
+	fs := http.FileServer(http.Dir("./media"))
+	http.HandleFunc("/", homePage)
+	http.HandleFunc("/upload", uploadFile)
+	http.Handle("/media/", http.StripPrefix("/media/", fs))
+	http.ListenAndServe(":8080", nil)
 }
 
 func main() {
-	http.HandleFunc("/", index)
-	http.HandleFunc("/upload", uploadAnPicture)
-	http.ListenAndServe(":8080", nil)
-
+	setupRoutes()
 }
