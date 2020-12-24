@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	ima "image"
 	"image/png"
+	"log"
 	"net/http"
 	"time"
 
@@ -34,11 +37,19 @@ func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
+	buffer := new(bytes.Buffer)
 
-	inputImage, err := png.Decode(image)
-	imgResized := resize.Resize(1366, 768, inputImage, resize.MitchellNetravali)
+	Decode_Image, _, err := ima.Decode(bytes.NewReader(buff))
+	if err != nil {
+		log.Fatal(err)
+	}
+	Resized_Image := resize.Resize(500, 500, Decode_Image, resize.Lanczos3)
 
-	fmt.Println(http.DetectContentType(buff))
+	err = png.Encode(buffer, Resized_Image)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf(buffer.String())
 
 	if http.DetectContentType(buff) == "image/png" || http.DetectContentType(buff) == "image/img" || http.DetectContentType(buff) == "image/jpeg" {
 		http.ServeContent(wr, r, handler.Filename, time.Now(), image)
@@ -46,7 +57,6 @@ func uploadAnImage(wr http.ResponseWriter, r *http.Request) {
 		http.Error(wr, "Invalid file format", http.StatusBadRequest)
 		return
 	} // Handle error
-	png.Encode(wr, imgResized)
 }
 
 func main() {
